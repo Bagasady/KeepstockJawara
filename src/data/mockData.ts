@@ -1,83 +1,79 @@
+import mysql from 'mysql2/promise';
 import { Product, StockItem, RefillItem, Store } from '../types';
 
-// Sample user credentials
-export const MOCK_USERS = [
-  { username: 'XPTN', password: '@JC5008', store: 'XPTN Store' },
-  { username: 'XPDN', password: '@JC2004', store: 'XPDN Store' },
-];
+// Create MySQL connection pool
+const pool = mysql.createPool({
+  host: process.env.DB_HOST || 'localhost',
+  user: process.env.DB_USER || 'root',
+  password: process.env.DB_PASSWORD || '',
+  database: process.env.DB_NAME || 'keepstock_db',
+  waitForConnections: true,
+  connectionLimit: 10,
+  queueLimit: 0
+});
 
-// Sample products data (from master CSV)
-export const MOCK_PRODUCTS: Product[] = [
-  { sku: '10100001', name: 'T-Shirt Basic Black', price: 99000, rack: 'A-01-01', department: 'Apparel' },
-  { sku: '10100002', name: 'T-Shirt Basic White', price: 99000, rack: 'A-01-02', department: 'Apparel' },
-  { sku: '10100003', name: 'T-Shirt Basic Navy', price: 99000, rack: 'A-01-03', department: 'Apparel' },
-  { sku: '10200001', name: 'Slim Fit Jeans Blue', price: 299000, rack: 'A-02-01', department: 'Apparel' },
-  { sku: '10200002', name: 'Slim Fit Jeans Black', price: 299000, rack: 'A-02-02', department: 'Apparel' },
-  { sku: '20100001', name: 'Running Shoes White', price: 599000, rack: 'B-01-01', department: 'Footwear' },
-  { sku: '20100002', name: 'Running Shoes Black', price: 599000, rack: 'B-01-02', department: 'Footwear' },
-  { sku: '30100001', name: 'Backpack 15L Grey', price: 199000, rack: 'C-01-01', department: 'Accessories' },
-  { sku: '30100002', name: 'Backpack 15L Black', price: 199000, rack: 'C-01-02', department: 'Accessories' },
-  { sku: '30200001', name: 'Cap Black', price: 129000, rack: 'C-02-01', department: 'Accessories' },
-];
-
-// Sample stores data
-export const MOCK_STORES: Store[] = [
-  { code: 'XPTN', name: 'XPTN Store', totalStock: 125 },
-  { code: 'XPDN', name: 'XPDN Store', totalStock: 98 },
-];
-
-// Initial stock items
-export const MOCK_STOCK_ITEMS: StockItem[] = [
-  { 
-    id: '1',
-    sku: '10100001', 
-    quantity: 25, 
-    boxNumber: 'XPTN-BOX-001', 
-    timestamp: '2025-01-15T09:30:00', 
-    storeName: 'XPTN Store' 
-  },
-  { 
-    id: '2',
-    sku: '10200001', 
-    quantity: 15, 
-    boxNumber: 'XPTN-BOX-002', 
-    timestamp: '2025-01-15T10:15:00', 
-    storeName: 'XPTN Store' 
-  },
-  { 
-    id: '3',
-    sku: '20100001', 
-    quantity: 10, 
-    boxNumber: 'XPDN-BOX-001', 
-    timestamp: '2025-01-14T14:20:00', 
-    storeName: 'XPDN Store' 
-  },
-];
-
-// Initial refill history
-export const MOCK_REFILL_ITEMS: RefillItem[] = [
-  { 
-    id: '1',
-    boxNumber: 'XPTN-BOX-001', 
-    quantity: 5, 
-    timestamp: '2025-01-16T11:30:00', 
-    storeName: 'XPTN Store' 
-  },
-  { 
-    id: '2',
-    boxNumber: 'XPDN-BOX-001', 
-    quantity: 3, 
-    timestamp: '2025-01-17T09:45:00', 
-    storeName: 'XPDN Store' 
-  },
-];
-
-// Helper function to find a product by SKU
-export const findProductBySku = (sku: string): Product | undefined => {
-  return MOCK_PRODUCTS.find(product => product.sku === sku);
+// User authentication
+export const authenticateUser = async (username: string, password: string) => {
+  const [rows] = await pool.query(
+    'SELECT username, store FROM users WHERE username = ? AND password = ?',
+    [username, password]
+  );
+  return (rows as any[])[0];
 };
 
-// Helper to get department from SKU (first 3 digits)
+// Product operations
+export const getProducts = async (): Promise<Product[]> => {
+  const [rows] = await pool.query('SELECT * FROM products');
+  return rows as Product[];
+};
+
+export const findProductBySku = async (sku: string): Promise<Product | undefined> => {
+  const [rows] = await pool.query('SELECT * FROM products WHERE sku = ?', [sku]);
+  const products = rows as Product[];
+  return products[0];
+};
+
+// Stock operations
+export const getStockItems = async (): Promise<StockItem[]> => {
+  const [rows] = await pool.query('SELECT * FROM stock_items ORDER BY timestamp DESC');
+  return rows as StockItem[];
+};
+
+export const addStockItem = async (item: Omit<StockItem, 'id' | 'timestamp'>): Promise<string> => {
+  const id = Date.now().toString();
+  const timestamp = new Date().toISOString().slice(0, 19).replace('T', ' ');
+  
+  await pool.query(
+    'INSERT INTO stock_items (id, sku, quantity, box_number, timestamp, store_name) VALUES (?, ?, ?, ?, ?, ?)',
+    [id, item.sku, item.quantity, item.boxNumber, timestamp, item.storeName]
+  );
+  
+  return id;
+};
+
+// Refill operations
+export const getRefillItems = async (): Promise<RefillItem[]> => {
+  const [rows] = await pool.query('SELECT * FROM refill_items ORDER BY timestamp DESC');
+  return rows as RefillItem[];
+};
+
+export const addRefillItem = async (item: Omit<RefillItem, 'id' | 'timestamp'>): Promise<void> => {
+  const id = Date.now().toString();
+  const timestamp = new Date().toISOString().slice(0, 19).replace('T', ' ');
+  
+  await pool.query(
+    'INSERT INTO refill_items (id, box_number, quantity, timestamp, store_name) VALUES (?, ?, ?, ?, ?)',
+    [id, item.boxNumber, item.quantity, timestamp, item.storeName]
+  );
+};
+
+// Store operations
+export const getStores = async (): Promise<Store[]> => {
+  const [rows] = await pool.query('SELECT * FROM stores');
+  return rows as Store[];
+};
+
+// Helper functions
 export const getDepartmentFromSku = (sku: string): string => {
   const departmentCode = sku.substring(0, 3);
   
@@ -92,22 +88,48 @@ export const getDepartmentFromSku = (sku: string): string => {
   return departmentMap[departmentCode] || 'Other';
 };
 
-// Generate a new unique box number for a store
-export const generateBoxNumber = (storeName: string, existingBoxes: string[]): string => {
+export const generateBoxNumber = async (storeName: string): Promise<string> => {
   const storeCode = storeName.split(' ')[0]; // Get the store code (XPTN, XPDN)
-  const boxNumbers = existingBoxes.filter(box => box.startsWith(storeCode));
   
+  // Get the latest box number for this store
+  const [rows] = await pool.query(
+    'SELECT box_number FROM stock_items WHERE store_name = ? ORDER BY box_number DESC LIMIT 1',
+    [storeName]
+  );
+  
+  const existingBoxes = rows as { box_number: string }[];
   let maxNumber = 0;
-  boxNumbers.forEach(boxNumber => {
-    const parts = boxNumber.split('-');
+  
+  if (existingBoxes.length > 0) {
+    const lastBox = existingBoxes[0].box_number;
+    const parts = lastBox.split('-');
     if (parts.length === 3) {
-      const number = parseInt(parts[2], 10);
-      if (!isNaN(number) && number > maxNumber) {
-        maxNumber = number;
-      }
+      maxNumber = parseInt(parts[2], 10) || 0;
     }
-  });
+  }
   
   const nextNumber = maxNumber + 1;
   return `${storeCode}-BOX-${nextNumber.toString().padStart(3, '0')}`;
+};
+
+// Error handling wrapper
+export const withErrorHandling = async <T>(operation: () => Promise<T>): Promise<T> => {
+  try {
+    return await operation();
+  } catch (error) {
+    console.error('Database operation failed:', error);
+    throw new Error('Database operation failed. Please try again later.');
+  }
+};
+
+// Initialize database connection
+export const initializeDatabase = async (): Promise<void> => {
+  try {
+    const connection = await pool.getConnection();
+    console.log('Database connection established successfully');
+    connection.release();
+  } catch (error) {
+    console.error('Failed to connect to database:', error);
+    throw new Error('Database connection failed');
+  }
 };
