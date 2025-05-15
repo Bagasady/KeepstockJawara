@@ -1,14 +1,15 @@
 # KeepStock Jawara Inventory System
 
-## Deployment Guide for cPanel Hosting
+## Deployment Guide for cPanel with Git Version Control
 
 ### Prerequisites
 - cPanel hosting account with:
+  - Git Version Control feature enabled
   - Node.js support (version 18 or higher)
   - MySQL database
   - PHP 8.0 or higher
 - Domain or subdomain where you want to deploy
-- FTP access credentials
+- Git installed on your local machine
 
 ### Step 1: Database Setup
 
@@ -19,95 +20,74 @@
    - Create a new user with a strong password
    - Assign all privileges to the user
 
-4. Import the initial database structure:
-   ```sql
-   -- Create products table
-   CREATE TABLE products (
-     sku VARCHAR(20) PRIMARY KEY,
-     name VARCHAR(255) NOT NULL,
-     price DECIMAL(10,2) NOT NULL,
-     rack VARCHAR(20) NOT NULL,
-     department VARCHAR(50) NOT NULL
-   );
+4. Import the initial database structure using phpMyAdmin or MySQL command line.
 
-   -- Create stock_items table
-   CREATE TABLE stock_items (
-     id VARCHAR(36) PRIMARY KEY,
-     sku VARCHAR(20) NOT NULL,
-     quantity INT NOT NULL,
-     box_number VARCHAR(20) NOT NULL,
-     timestamp DATETIME NOT NULL,
-     store_name VARCHAR(50) NOT NULL,
-     FOREIGN KEY (sku) REFERENCES products(sku)
-   );
+### Step 2: Set Up Git Version Control in cPanel
 
-   -- Create refill_items table
-   CREATE TABLE refill_items (
-     id VARCHAR(36) PRIMARY KEY,
-     box_number VARCHAR(20) NOT NULL,
-     quantity INT NOT NULL,
-     timestamp DATETIME NOT NULL,
-     store_name VARCHAR(50) NOT NULL
-   );
+1. Log in to cPanel
+2. Navigate to "Git™ Version Control"
+3. Click "Create" to set up a new Git repository
+4. Fill in the repository details:
+   - Clone URL: Your repository URL
+   - Repository path: `public_html/keepstock` (or your preferred directory)
+   - Repository name: `keepstock`
+5. Click "Create" to create the repository
 
-   -- Create stores table
-   CREATE TABLE stores (
-     code VARCHAR(10) PRIMARY KEY,
-     name VARCHAR(50) NOT NULL,
-     total_stock INT NOT NULL DEFAULT 0
-   );
+### Step 3: Configure Local Repository
 
-   -- Create users table
-   CREATE TABLE users (
-     username VARCHAR(50) PRIMARY KEY,
-     password VARCHAR(255) NOT NULL,
-     store VARCHAR(50) NOT NULL
-   );
+1. Initialize Git in your local project (if not already done):
+   ```bash
+   git init
    ```
 
-### Step 2: Project Setup
+2. Create .gitignore file:
+   ```
+   node_modules/
+   .env
+   .DS_Store
+   ```
 
-1. Build the project locally:
+3. Add cPanel repository as remote:
+   ```bash
+   git remote add cpanel ssh://username@your-domain.com:2222/home/username/repositories/keepstock
+   ```
+
+4. Add and commit your files:
+   ```bash
+   git add .
+   git commit -m "Initial commit"
+   ```
+
+### Step 4: Deploy to cPanel
+
+1. Push your code to cPanel:
+   ```bash
+   git push cpanel master
+   ```
+
+2. In cPanel, go to "Git™ Version Control"
+3. Click "Manage" next to your repository
+4. Click "Pull or Deploy"
+5. Click "Update from Remote" to pull changes
+6. Click "Deploy HEAD Commit" to deploy
+
+### Step 5: Post-Deployment Setup
+
+1. SSH into your server or use cPanel Terminal
+2. Navigate to your project directory
+3. Install dependencies:
+   ```bash
+   npm install
+   ```
+
+4. Build the project:
    ```bash
    npm run build
    ```
 
-2. Upload files to cPanel:
-   - Using FTP, upload the contents of the `dist` folder to `public_html` or your desired subdirectory
-   - Create a new directory called `server` in your hosting root
-   - Upload the following server files to the `server` directory:
-     - `src/data/mockData.ts` (modified for database connection)
-     - `.env` (with database credentials)
-
-3. Modify the database connection in `mockData.ts`:
-   ```typescript
-   import mysql from 'mysql2/promise';
-
-   const pool = mysql.createPool({
-     host: process.env.DB_HOST,
-     user: process.env.DB_USER,
-     password: process.env.DB_PASSWORD,
-     database: process.env.DB_NAME,
-     waitForConnections: true,
-     connectionLimit: 10,
-     queueLimit: 0
-   });
-
-   // Replace mock data with database queries
-   export const getProducts = async (): Promise<Product[]> => {
-     const [rows] = await pool.query('SELECT * FROM products');
-     return rows as Product[];
-   };
-
-   export const getStockItems = async (): Promise<StockItem[]> => {
-     const [rows] = await pool.query('SELECT * FROM stock_items');
-     return rows as StockItem[];
-   };
-
-   // Add similar functions for other data operations
-   ```
-
-4. Create `.env` file in the server directory:
+5. Set up environment variables in cPanel:
+   - Create a `.env` file in your project root
+   - Add necessary environment variables:
    ```
    DB_HOST=localhost
    DB_USER=your_database_user
@@ -115,82 +95,68 @@
    DB_NAME=keepstock_db
    ```
 
-### Step 3: Configure cPanel
+### Automatic Deployment
 
-1. Set up Node.js:
-   - Go to "Setup Node.js App" in cPanel
-   - Create a new application
-   - Set the application path to your server directory
-   - Set the application URL
-   - Set Node.js version to 18.x
-   - Set NPM version to 9.x
-   - Enable application startup after setup
+To set up automatic deployment:
 
-2. Configure environment:
-   - In cPanel, go to "Software > MultiPHP INI Editor"
-   - Set memory_limit to at least "256M"
-   - Set max_execution_time to "300"
-   - Set upload_max_filesize to "64M"
+1. In cPanel Git Version Control:
+   - Click "Manage" for your repository
+   - Enable "Automatic Deployment"
+   - Set branch to deploy (usually 'master' or 'main')
 
-3. Set up SSL (recommended):
-   - Go to "Security > SSL/TLS"
-   - Install SSL certificate for your domain
-   - Enable "Force HTTPS" redirection
+2. Add post-receive hook:
+   ```bash
+   #!/bin/bash
+   cd /home/username/public_html/keepstock
+   npm install
+   npm run build
+   ```
 
-### Step 4: Final Configuration
+### Security Considerations
 
-1. Update the frontend API endpoints:
-   - Modify the API base URL in your production build to point to your server
-   - Update CORS settings if necessary
-
-2. Test the deployment:
-   - Visit your domain/subdomain
-   - Verify all features are working
-   - Check database connections
-   - Test user authentication
+1. Use SSH keys for Git authentication
+2. Keep your .env file out of version control
+3. Use HTTPS for your domain
+4. Regularly update dependencies
+5. Back up your database regularly
 
 ### Troubleshooting
 
 Common issues and solutions:
 
-1. Database Connection Errors:
-   - Verify database credentials in `.env`
+1. Git Push Errors:
+   - Verify SSH credentials
+   - Check repository permissions
+   - Ensure correct remote URL
+
+2. Build Errors:
+   - Check Node.js version compatibility
+   - Verify all dependencies are installed
+   - Check build logs
+
+3. Database Connection Issues:
+   - Verify database credentials
    - Check database user permissions
    - Ensure proper table structure
 
-2. 500 Internal Server Error:
-   - Check Node.js application logs
-   - Verify file permissions
-   - Check PHP error logs
-
-3. White Screen / Blank Page:
-   - Enable error reporting in PHP
-   - Check browser console for JavaScript errors
-   - Verify all static assets are properly loaded
-
-### Security Considerations
-
-1. Always use HTTPS
-2. Implement proper authentication
-3. Use environment variables for sensitive data
-4. Regular database backups
-5. Keep Node.js and npm packages updated
-
 ### Maintenance
 
-1. Regular backups:
-   - Database
-   - Application files
+1. Regular Updates:
+   ```bash
+   git pull origin master
+   npm install
+   npm run build
+   git push cpanel master
+   ```
+
+2. Monitor:
+   - Server resources
+   - Database performance
+   - Error logs
+
+3. Backup:
+   - Database backups
+   - Regular code commits
    - Environment configurations
-
-2. Monitoring:
-   - Set up server monitoring
-   - Configure error logging
-   - Monitor database performance
-
-3. Updates:
-   - Keep Node.js version current
-   - Update npm packages regularly
-   - Monitor security advisories
 
 For additional support or questions, please contact the development team.
