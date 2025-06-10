@@ -9,6 +9,7 @@ interface ButtonProps {
   disabled?: boolean;
   onClick?: () => void;
   icon?: React.ReactNode;
+  fullWidth?: boolean;
 }
 
 const Button: React.FC<ButtonProps> = ({
@@ -20,6 +21,7 @@ const Button: React.FC<ButtonProps> = ({
   disabled = false,
   onClick,
   icon,
+  fullWidth = false,
 }) => {
   const baseStyles = "inline-flex items-center justify-center font-medium rounded focus:outline-none focus:ring-2 focus:ring-offset-2 transition-all duration-200";
   
@@ -38,11 +40,12 @@ const Button: React.FC<ButtonProps> = ({
   };
   
   const disabledStyles = disabled ? "opacity-50 cursor-not-allowed" : "cursor-pointer";
+  const widthStyles = fullWidth ? "w-full" : "";
   
   return (
     <button
       type={type}
-      className={`${baseStyles} ${variantStyles[variant]} ${sizeStyles[size]} ${disabledStyles} ${className}`}
+      className={`${baseStyles} ${variantStyles[variant]} ${sizeStyles[size]} ${disabledStyles} ${widthStyles} ${className}`}
       disabled={disabled}
       onClick={onClick}
     >

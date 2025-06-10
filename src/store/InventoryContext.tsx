@@ -13,13 +13,22 @@ interface InventoryContextType {
   stockItems: StockItem[];
   refillItems: RefillItem[];
   addStockItem: (item: Omit<StockItem, 'id' | 'timestamp'>) => string;
+  updateStockItem: (id: string, updates: Partial<StockItem>) => boolean;
+  deleteStockItem: (id: string) => boolean;
   addRefillItem: (item: Omit<RefillItem, 'id' | 'timestamp'>) => void;
+  updateRefillItem: (id: string, updates: Partial<RefillItem>) => boolean;
+  deleteRefillItem: (id: string) => boolean;
   getStoreStockItems: () => StockItem[];
   getStoreRefillItems: () => RefillItem[];
   getTotalStockForStore: () => number;
   getUniqueBoxNumbers: () => string[];
   generateNewBoxNumber: () => string;
   getProductBySkuForStore: (sku: string) => Product | undefined;
+  getStockItemById: (id: string) => StockItem | undefined;
+  getRefillItemById: (id: string) => RefillItem | undefined;
+  searchStockItems: (query: string) => StockItem[];
+  getStockByDepartment: () => Record<string, number>;
+  getLowStockItems: (threshold?: number) => StockItem[];
 }
 
 const InventoryContext = createContext<InventoryContextType>({
@@ -27,13 +36,22 @@ const InventoryContext = createContext<InventoryContextType>({
   stockItems: [],
   refillItems: [],
   addStockItem: () => '',
+  updateStockItem: () => false,
+  deleteStockItem: () => false,
   addRefillItem: () => {},
+  updateRefillItem: () => false,
+  deleteRefillItem: () => false,
   getStoreStockItems: () => [],
   getStoreRefillItems: () => [],
   getTotalStockForStore: () => 0,
   getUniqueBoxNumbers: () => [],
   generateNewBoxNumber: () => '',
   getProductBySkuForStore: () => undefined,
+  getStockItemById: () => undefined,
+  getRefillItemById: () => undefined,
+  searchStockItems: () => [],
+  getStockByDepartment: () => ({}),
+  getLowStockItems: () => [],
 });
 
 export const useInventory = () => useContext(InventoryContext);
@@ -92,7 +110,7 @@ export const InventoryProvider: React.FC<InventoryProviderProps> = ({ children }
   const addStockItem = (item: Omit<StockItem, 'id' | 'timestamp'>): string => {
     const newItem: StockItem = {
       ...item,
-      id: Date.now().toString(),
+      id: Date.now().toString() + Math.random().toString(36).substr(2, 9),
       timestamp: new Date().toISOString(),
     };
     
@@ -100,18 +118,98 @@ export const InventoryProvider: React.FC<InventoryProviderProps> = ({ children }
     return newItem.id;
   };
 
+  const updateStockItem = (id: string, updates: Partial<StockItem>): boolean => {
+    setStockItems(prev => {
+      const index = prev.findIndex(item => item.id === id);
+      if (index === -1) return prev;
+      
+      const updatedItems = [...prev];
+      updatedItems[index] = { ...updatedItems[index], ...updates };
+      return updatedItems;
+    });
+    return true;
+  };
+
+  const deleteStockItem = (id: string): boolean => {
+    setStockItems(prev => prev.filter(item => item.id !== id));
+    return true;
+  };
+
   const addRefillItem = (item: Omit<RefillItem, 'id' | 'timestamp'>): void => {
     const newItem: RefillItem = {
       ...item,
-      id: Date.now().toString(),
+      id: Date.now().toString() + Math.random().toString(36).substr(2, 9),
       timestamp: new Date().toISOString(),
     };
     
     setRefillItems(prev => [...prev, newItem]);
   };
 
+  const updateRefillItem = (id: string, updates: Partial<RefillItem>): boolean => {
+    setRefillItems(prev => {
+      const index = prev.findIndex(item => item.id === id);
+      if (index === -1) return prev;
+      
+      const updatedItems = [...prev];
+      updatedItems[index] = { ...updatedItems[index], ...updates };
+      return updatedItems;
+    });
+    return true;
+  };
+
+  const deleteRefillItem = (id: string): boolean => {
+    setRefillItems(prev => prev.filter(item => item.id !== id));
+    return true;
+  };
+
   const getProductBySkuForStore = (sku: string): Product | undefined => {
     return products.find(p => p.sku === sku);
+  };
+
+  const getStockItemById = (id: string): StockItem | undefined => {
+    return stockItems.find(item => item.id === id);
+  };
+
+  const getRefillItemById = (id: string): RefillItem | undefined => {
+    return refillItems.find(item => item.id === id);
+  };
+
+  const searchStockItems = (query: string): StockItem[] => {
+    const storeItems = getStoreStockItems();
+    if (!query.trim()) return storeItems;
+    
+    const lowercaseQuery = query.toLowerCase();
+    return storeItems.filter(item => {
+      const product = products.find(p => p.sku === item.sku);
+      return (
+        item.sku.toLowerCase().includes(lowercaseQuery) ||
+        item.boxNumber.toLowerCase().includes(lowercaseQuery) ||
+        (product && product.name.toLowerCase().includes(lowercaseQuery)) ||
+        (product && product.department.toLowerCase().includes(lowercaseQuery))
+      );
+    });
+  };
+
+  const getStockByDepartment = (): Record<string, number> => {
+    const storeItems = getStoreStockItems();
+    const departmentStock: Record<string, number> = {};
+    
+    storeItems.forEach(item => {
+      const product = products.find(p => p.sku === item.sku);
+      if (product) {
+        if (!departmentStock[product.department]) {
+          departmentStock[product.department] = 0;
+        }
+        departmentStock[product.department] += item.quantity;
+      }
+    });
+    
+    return departmentStock;
+  };
+
+  const getLowStockItems = (threshold: number = 10): StockItem[] => {
+    const storeItems = getStoreStockItems();
+    return storeItems.filter(item => item.quantity <= threshold);
   };
 
   const value = {
@@ -119,13 +217,22 @@ export const InventoryProvider: React.FC<InventoryProviderProps> = ({ children }
     stockItems,
     refillItems,
     addStockItem,
+    updateStockItem,
+    deleteStockItem,
     addRefillItem,
+    updateRefillItem,
+    deleteRefillItem,
     getStoreStockItems,
     getStoreRefillItems,
     getTotalStockForStore,
     getUniqueBoxNumbers,
     generateNewBoxNumber,
     getProductBySkuForStore,
+    getStockItemById,
+    getRefillItemById,
+    searchStockItems,
+    getStockByDepartment,
+    getLowStockItems,
   };
 
   return (

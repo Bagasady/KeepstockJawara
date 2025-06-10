@@ -1,40 +1,37 @@
 import React, { useState } from 'react';
-import { StockItem } from '../../types';
+import { RefillItem } from '../../types';
 import { useInventory } from '../../store/InventoryContext';
-import { Package, Calendar, Tag, Edit, Trash2, Eye, Search } from 'lucide-react';
+import { Package, Calendar, Edit, Trash2, Search } from 'lucide-react';
 import Button from '../common/Button';
 import Input from '../common/Input';
-import EditStockModal from './EditStockModal';
+import EditRefillModal from './EditRefillModal';
 import DeleteConfirmModal from './DeleteConfirmModal';
 
-interface StockTableProps {
-  items?: StockItem[];
+interface RefillTableProps {
+  items?: RefillItem[];
   showActions?: boolean;
   enableSearch?: boolean;
 }
 
-const StockTable: React.FC<StockTableProps> = ({ 
+const RefillTable: React.FC<RefillTableProps> = ({ 
   items, 
   showActions = false,
   enableSearch = false
 }) => {
-  const { products, getStoreStockItems, searchStockItems, deleteStockItem } = useInventory();
+  const { getStoreRefillItems, deleteRefillItem } = useInventory();
   const [searchQuery, setSearchQuery] = useState('');
-  const [editingItem, setEditingItem] = useState<StockItem | null>(null);
-  const [deletingItem, setDeletingItem] = useState<StockItem | null>(null);
+  const [editingItem, setEditingItem] = useState<RefillItem | null>(null);
+  const [deletingItem, setDeletingItem] = useState<RefillItem | null>(null);
   
   // Use provided items or get store items
-  const allItems = items || getStoreStockItems();
+  const allItems = items || getStoreRefillItems();
   
   // Apply search if enabled
   const displayItems = enableSearch && searchQuery.trim() 
-    ? searchStockItems(searchQuery)
+    ? allItems.filter(item => 
+        item.boxNumber.toLowerCase().includes(searchQuery.toLowerCase())
+      )
     : allItems;
-  
-  const getProductName = (sku: string): string => {
-    const product = products.find(p => p.sku === sku);
-    return product ? product.name : 'Unknown Product';
-  };
   
   const formatDate = (dateString: string): string => {
     const date = new Date(dateString);
@@ -47,17 +44,17 @@ const StockTable: React.FC<StockTableProps> = ({
     }).format(date);
   };
 
-  const handleEdit = (item: StockItem) => {
+  const handleEdit = (item: RefillItem) => {
     setEditingItem(item);
   };
 
-  const handleDelete = (item: StockItem) => {
+  const handleDelete = (item: RefillItem) => {
     setDeletingItem(item);
   };
 
   const confirmDelete = () => {
     if (deletingItem) {
-      deleteStockItem(deletingItem.id);
+      deleteRefillItem(deletingItem.id);
       setDeletingItem(null);
     }
   };
@@ -68,7 +65,7 @@ const StockTable: React.FC<StockTableProps> = ({
         {enableSearch && (
           <div className="p-4 border-b border-gray-200">
             <Input
-              placeholder="Search by SKU, box number, product name, or department..."
+              placeholder="Search by box number..."
               value={searchQuery}
               onChange={(e) => setSearchQuery(e.target.value)}
               icon={<Search size={18} />}
@@ -79,12 +76,12 @@ const StockTable: React.FC<StockTableProps> = ({
         <div className="p-8 text-center">
           <Package size={48} className="mx-auto text-gray-400 mb-4" />
           <h3 className="text-lg font-medium text-gray-900 mb-1">
-            {searchQuery ? 'No matching items found' : 'No Stock Items'}
+            {searchQuery ? 'No matching refills found' : 'No Refill Records'}
           </h3>
           <p className="text-gray-500">
             {searchQuery 
               ? 'Try adjusting your search criteria' 
-              : 'There are no stock items to display.'}
+              : 'There are no refill records to display.'}
           </p>
         </div>
       </div>
@@ -97,7 +94,7 @@ const StockTable: React.FC<StockTableProps> = ({
         {enableSearch && (
           <div className="p-4 border-b border-gray-200">
             <Input
-              placeholder="Search by SKU, box number, product name, or department..."
+              placeholder="Search by box number..."
               value={searchQuery}
               onChange={(e) => setSearchQuery(e.target.value)}
               icon={<Search size={18} />}
@@ -114,16 +111,10 @@ const StockTable: React.FC<StockTableProps> = ({
                   Box Number
                 </th>
                 <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                  Product
+                  Refill Quantity
                 </th>
                 <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                  SKU
-                </th>
-                <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                  Quantity
-                </th>
-                <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                  Date Added
+                  Date Refilled
                 </th>
                 {showActions && (
                   <th scope="col" className="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">
@@ -137,30 +128,13 @@ const StockTable: React.FC<StockTableProps> = ({
                 <tr key={item.id} className="hover:bg-gray-50 transition-colors">
                   <td className="px-6 py-4 whitespace-nowrap">
                     <div className="flex items-center">
-                      <Package size={16} className="mr-2 text-blue-500" />
-                      <span className="font-medium text-blue-600">{item.boxNumber}</span>
-                    </div>
-                  </td>
-                  <td className="px-6 py-4">
-                    <div className="text-sm font-medium text-gray-900">
-                      {getProductName(item.sku)}
+                      <Package size={16} className="mr-2 text-green-500" />
+                      <span className="font-medium text-green-600">{item.boxNumber}</span>
                     </div>
                   </td>
                   <td className="px-6 py-4 whitespace-nowrap">
-                    <div className="flex items-center">
-                      <Tag size={16} className="mr-2 text-gray-400" />
-                      <span className="text-sm text-gray-500">{item.sku}</span>
-                    </div>
-                  </td>
-                  <td className="px-6 py-4 whitespace-nowrap">
-                    <span className={`px-3 py-1 inline-flex text-sm leading-5 font-semibold rounded-full ${
-                      item.quantity <= 10 
-                        ? 'bg-red-100 text-red-800' 
-                        : item.quantity <= 20 
-                        ? 'bg-yellow-100 text-yellow-800'
-                        : 'bg-green-100 text-green-800'
-                    }`}>
-                      {item.quantity}
+                    <span className="px-3 py-1 inline-flex text-sm leading-5 font-semibold rounded-full bg-green-100 text-green-800">
+                      +{item.quantity}
                     </span>
                   </td>
                   <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
@@ -200,7 +174,7 @@ const StockTable: React.FC<StockTableProps> = ({
 
       {/* Edit Modal */}
       {editingItem && (
-        <EditStockModal
+        <EditRefillModal
           item={editingItem}
           onClose={() => setEditingItem(null)}
           onSave={() => setEditingItem(null)}
@@ -210,8 +184,8 @@ const StockTable: React.FC<StockTableProps> = ({
       {/* Delete Confirmation Modal */}
       {deletingItem && (
         <DeleteConfirmModal
-          title="Delete Stock Item"
-          message={`Are you sure you want to delete stock item ${deletingItem.boxNumber}? This action cannot be undone.`}
+          title="Delete Refill Record"
+          message={`Are you sure you want to delete this refill record for ${deletingItem.boxNumber}? This action cannot be undone.`}
           onConfirm={confirmDelete}
           onCancel={() => setDeletingItem(null)}
         />
@@ -220,4 +194,4 @@ const StockTable: React.FC<StockTableProps> = ({
   );
 };
 
-export default StockTable;
+export default RefillTable;
