@@ -20,7 +20,7 @@ const DeleteConfirmModal: React.FC<DeleteConfirmModalProps> = ({
       <div className="bg-white rounded-lg shadow-xl max-w-md w-full">
         <div className="flex items-center justify-between p-6 border-b border-gray-200">
           <h2 className="text-lg font-semibold text-gray-900 flex items-center">
-            <AlertTriangle className="mr-2 text-red-500" size={20} />
+            <AlertTriangle className="mr-2 text-red-500\" size={20} />
             {title}
           </h2>
           <button
